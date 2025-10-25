@@ -14,7 +14,7 @@ import '../auth.dart';
 
 class EditEventPage extends StatefulWidget {
   final String image, name, desc, loc, datetime, guests, sponsers, docID;
-  final bool isInPerson;
+  final bool isinPerson;
   const EditEventPage(
       {super.key,
       required this.image,
@@ -25,7 +25,7 @@ class EditEventPage extends StatefulWidget {
       required this.guests,
       required this.sponsers,
       required this.docID,
-      required this.isInPerson});
+      required this.isinPerson});
 
   @override
   State<EditEventPage> createState() => _EditEventPageState();
@@ -36,7 +36,7 @@ class _EditEventPageState extends State<EditEventPage>
   late AnimationController _controller;
 
   FilePickerResult? _filePickerResult;
-  bool _isInPersonEvent = true;
+  bool _isinPersonEvent = true;
   final TextEditingController _nameController = TextEditingController();
   final TextEditingController _descController = TextEditingController();
   final TextEditingController _locationController = TextEditingController();
@@ -58,7 +58,7 @@ class _EditEventPageState extends State<EditEventPage>
     _dateTimeController.text = widget.datetime;
     _guestController.text = widget.guests;
     _sponsersController.text = widget.sponsers;
-    _isInPersonEvent = widget.isInPerson;
+    _isinPersonEvent = widget.isinPerson;
   }
 
   @override
@@ -115,7 +115,7 @@ class _EditEventPageState extends State<EditEventPage>
             InputFile.fromBytes(bytes: fileByes, filename: file.name);
 
         final response = await storage.createFile(
-            bucketId: '64bcdd3ad336eaa231f0',
+            bucketId: '68fc86bb00342c85a173',
             fileId: ID.unique(),
             file: inputFile);
         print(response.$id);
@@ -167,7 +167,7 @@ class _EditEventPageState extends State<EditEventPage>
                       : ClipRRect(
                           borderRadius: BorderRadius.circular(8),
                           child: Image.network(
-                            "https://cloud.appwrite.io/v1/storage/buckets/64bcdd3ad336eaa231f0/files/${widget.image}/view?project=64b4fc61e5f4aa023618",
+                            "https://nyc.cloud.appwrite.io/v1/storage/buckets/68fc86bb00342c85a173/files/${widget.image}/view?project=68faf6ff001d1fd7c779&mode=admin",
                             fit: BoxFit.fill,
                           ))),
             ),
@@ -239,10 +239,10 @@ class _EditEventPageState extends State<EditEventPage>
                 Switch(
                     activeColor: kLightGreen,
                     focusColor: Colors.green,
-                    value: _isInPersonEvent,
+                    value: _isinPersonEvent,
                     onChanged: (value) {
                       setState(() {
-                        _isInPersonEvent = value;
+                        _isinPersonEvent = value;
                       });
                     }),
               ],
@@ -272,7 +272,7 @@ class _EditEventPageState extends State<EditEventPage>
                               _locationController.text,
                               _dateTimeController.text,
                               userId,
-                              _isInPersonEvent,
+                              _isinPersonEvent,
                               _guestController.text,
                               _sponsersController.text,
                               widget.docID)
@@ -290,7 +290,7 @@ class _EditEventPageState extends State<EditEventPage>
                               _locationController.text,
                               _dateTimeController.text,
                               userId,
-                              _isInPersonEvent,
+                              _isinPersonEvent,
                               _guestController.text,
                               _sponsersController.text,
                               widget.docID))

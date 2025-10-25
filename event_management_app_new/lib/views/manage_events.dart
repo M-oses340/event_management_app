@@ -67,8 +67,8 @@ class _ManageEventsState extends State<ManageEvents> {
                               guests: userCreatedEvents[index].data["guests"],
                               sponsers:
                                   userCreatedEvents[index].data["sponsers"],
-                              isInPerson:
-                                  userCreatedEvents[index].data["isInPerson"],
+                              isinPerson:
+                                  userCreatedEvents[index].data["isinPerson"],
                               docID: userCreatedEvents[index].$id,
                             )));
                 refresh();

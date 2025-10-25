@@ -89,18 +89,31 @@ class _CreateEventPageState extends State<CreateEventPage> {
     setState(() => isUploading = true);
 
     try {
-      final inputFile =
-      InputFile.fromBytes(bytes: _imageBytes!, filename: "event_image.jpg");
+      final inputFile = InputFile.fromBytes(
+        bytes: _imageBytes!,
+        filename: "event_image.jpg",
+      );
+
       final response = await storage.createFile(
-          bucketId: '64bcdd3ad336eaa231f0', fileId: ID.unique(), file: inputFile);
+        bucketId: '68fc86bb00342c85a173',
+        fileId: ID.unique(),
+        file: inputFile,
+        permissions: [
+          Permission.read(Role.any()), // 👈 Public read access
+          Permission.write(Role.user(SavedData.getUserId())), // owner can edit/delete
+        ],
+      );
+
+      print("✅ File uploaded with ID: ${response.$id}");
       return response.$id;
     } catch (e) {
-      print(e);
+      print("❌ Error uploading image: $e");
       return null;
     } finally {
       setState(() => isUploading = false);
     }
   }
+
 
   @override
   Widget build(BuildContext context) {

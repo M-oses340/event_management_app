@@ -3,31 +3,47 @@ import 'package:appwrite/models.dart';
 import 'package:event_management_app/saved_data.dart';
 import 'auth.dart';
 
-// ✅ Use your actual Database ID
-String databaseId = "68fb0b4a000e7ff34dd4";
-
-// ✅ Define collection IDs clearly
-const String userCollectionId = "user_data";
-const String eventCollectionId = "events"; // make sure you have this in Appwrite
-
 final Databases databases = Databases(client);
 
-/// ----------------------------
-/// USER MANAGEMENT
-/// ----------------------------
+const String databaseId = "68fb0b4a000e7ff34dd4";
+const String userCollectionId = "user_data";
+const String eventCollectionId = "events";
 
-// ✅ Save the user data to Appwrite database
+// ----------------------------
+// SESSION CHECK HELPER
+// ----------------------------
+Future<bool> ensureSession() async {
+  final loggedIn = await checkSessions();
+  if (!loggedIn) {
+    print("❌ User not logged in. Please log in first.");
+    return false;
+  }
+  return true;
+}
+
+// ----------------------------
+// USER MANAGEMENT
+// ----------------------------
 Future<void> saveUserData(String name, String email, String userId) async {
+  if (!await ensureSession()) return;
+
   try {
     await databases.createDocument(
       databaseId: databaseId,
       collectionId: userCollectionId,
-      documentId: userId, // Use Appwrite user ID as document ID
+      documentId: userId,
       data: {
         "name": name,
         "email": email,
-        "user_id": userId, // Required by schema
+        "user_id": userId,
       },
+      // ✅ Allow the user to read/write their own document
+      permissions: [
+        Permission.read(Role.user(userId)),
+        Permission.update(Role.user(userId)),
+        Permission.delete(Role.user(userId)),
+        Permission.write(Role.user(userId)),
+      ],
     );
     print("✅ User document created successfully");
   } catch (e) {
@@ -35,9 +51,9 @@ Future<void> saveUserData(String name, String email, String userId) async {
   }
 }
 
-
-// ✅ Get user data from Appwrite database
 Future<void> getUserData() async {
+  if (!await ensureSession()) return;
+
   final userId = SavedData.getUserId();
   print("🔎 Getting user data for ID: $userId");
 
@@ -50,21 +66,16 @@ Future<void> getUserData() async {
 
     SavedData.saveUserName(doc.data['name']);
     SavedData.saveUserEmail(doc.data['email']);
-
     print("✅ User data loaded successfully");
   } catch (e) {
-    print("⚠️ No user document found for $userId, creating one...");
-    // Auto-create with default values matching schema
+    print("⚠️ No user document found, creating default...");
     await saveUserData("Unknown Name", "unknown@email.com", userId);
   }
 }
 
-
-/// ----------------------------
-/// EVENT MANAGEMENT
-/// ----------------------------
-
-// ✅ Create a new event
+// ----------------------------
+// EVENT MANAGEMENT
+// ----------------------------
 Future<void> createEvent(
     String name,
     String desc,
@@ -72,15 +83,25 @@ Future<void> createEvent(
     String location,
     String datetime,
     String createdBy,
-    bool isInPersonOrNot,
+    bool isinPersonOrNot,
     String guest,
     String sponsors,
     ) async {
+  if (!await ensureSession()) return;
+
+  final userId = await SavedData.getUserId();
+
   try {
     await databases.createDocument(
       databaseId: databaseId,
       collectionId: eventCollectionId,
       documentId: ID.unique(),
+      permissions: [
+        Permission.read(Role.any()), // 👈 or Role.user(createdBy)
+        Permission.write(Role.user(createdBy)),
+        Permission.update(Role.user(createdBy)),
+        Permission.delete(Role.user(createdBy)),
+      ],
       data: {
         "name": name,
         "description": desc,
@@ -88,24 +109,27 @@ Future<void> createEvent(
         "location": location,
         "datetime": datetime,
         "createdBy": createdBy,
-        "isInPerson": isInPersonOrNot,
+        "isinPerson": isinPersonOrNot,
         "guests": guest,
         "sponsors": sponsors,
       },
     );
+
     print("✅ Event created successfully");
   } catch (e) {
     print("❌ Error creating event: $e");
   }
 }
 
-// ✅ Get all events
 Future<List<Document>> getAllEvents() async {
+  if (!await ensureSession()) return [];
+
   try {
     final response = await databases.listDocuments(
       databaseId: databaseId,
       collectionId: eventCollectionId,
     );
+    print("✅ Fetched ${response.documents.length} events");
     return response.documents;
   } catch (e) {
     print("❌ Error fetching events: $e");
@@ -113,10 +137,13 @@ Future<List<Document>> getAllEvents() async {
   }
 }
 
-// ✅ RSVP event
 Future<bool> rsvpEvent(List participants, String documentId) async {
-  final userId = SavedData.getUserId();
-  participants.add(userId);
+  if (!await ensureSession()) return false;
+
+  final userId = await SavedData.getUserId();
+  if (!participants.contains(userId)) {
+    participants.add(userId);
+  }
 
   try {
     await databases.updateDocument(
@@ -125,6 +152,7 @@ Future<bool> rsvpEvent(List participants, String documentId) async {
       documentId: documentId,
       data: {"participants": participants},
     );
+    print("✅ RSVP successful");
     return true;
   } catch (e) {
     print("❌ Error RSVP-ing event: $e");
@@ -132,9 +160,10 @@ Future<bool> rsvpEvent(List participants, String documentId) async {
   }
 }
 
-// ✅ Get events created by the user
 Future<List<Document>> manageEvents() async {
-  final userId = SavedData.getUserId();
+  if (!await ensureSession()) return [];
+
+  final userId = await SavedData.getUserId();
   try {
     final response = await databases.listDocuments(
       databaseId: databaseId,
@@ -148,7 +177,6 @@ Future<List<Document>> manageEvents() async {
   }
 }
 
-// ✅ Update an existing event
 Future<void> updateEvent(
     String name,
     String desc,
@@ -161,6 +189,8 @@ Future<void> updateEvent(
     String sponsors,
     String docID,
     ) async {
+  if (!await ensureSession()) return;
+
   try {
     await databases.updateDocument(
       databaseId: databaseId,
@@ -184,8 +214,9 @@ Future<void> updateEvent(
   }
 }
 
-// ✅ Delete event
 Future<void> deleteEvent(String docID) async {
+  if (!await ensureSession()) return;
+
   try {
     await databases.deleteDocument(
       databaseId: databaseId,
@@ -198,8 +229,9 @@ Future<void> deleteEvent(String docID) async {
   }
 }
 
-// ✅ Upcoming events
 Future<List<Document>> getUpcomingEvents() async {
+  if (!await ensureSession()) return [];
+
   try {
     final now = DateTime.now().toIso8601String();
     final response = await databases.listDocuments(
@@ -214,8 +246,9 @@ Future<List<Document>> getUpcomingEvents() async {
   }
 }
 
-// ✅ Past events
 Future<List<Document>> getPastEvents() async {
+  if (!await ensureSession()) return [];
+
   try {
     final now = DateTime.now().toIso8601String();
     final response = await databases.listDocuments(
