@@ -21,6 +21,7 @@ class _CreateEventPageState extends State<CreateEventPage> {
   final MobilePicker _picker = MobilePicker();
   Uint8List? _imageBytes;
   bool _isInPersonEvent = true;
+  bool _isLoading = false;
 
   final TextEditingController _nameController = TextEditingController();
   final TextEditingController _descController = TextEditingController();
@@ -30,7 +31,6 @@ class _CreateEventPageState extends State<CreateEventPage> {
   final TextEditingController _sponsersController = TextEditingController();
 
   Storage storage = Storage(client);
-  bool isUploading = false;
   String userId = "";
 
   @override
@@ -52,10 +52,11 @@ class _CreateEventPageState extends State<CreateEventPage> {
 
   Future<void> _selectDateTime(BuildContext context) async {
     final DateTime? pickedDate = await showDatePicker(
-        context: context,
-        initialDate: DateTime.now(),
-        firstDate: DateTime.now(),
-        lastDate: DateTime(2100));
+      context: context,
+      initialDate: DateTime.now(),
+      firstDate: DateTime.now(),
+      lastDate: DateTime(2100),
+    );
 
     if (pickedDate != null) {
       final TimeOfDay? pickedTime =
@@ -63,11 +64,12 @@ class _CreateEventPageState extends State<CreateEventPage> {
 
       if (pickedTime != null) {
         final DateTime selectedDateTime = DateTime(
-            pickedDate.year,
-            pickedDate.month,
-            pickedDate.day,
-            pickedTime.hour,
-            pickedTime.minute);
+          pickedDate.year,
+          pickedDate.month,
+          pickedDate.day,
+          pickedTime.hour,
+          pickedTime.minute,
+        );
         setState(() {
           _dateTimeController.text = selectedDateTime.toString();
         });
@@ -86,7 +88,6 @@ class _CreateEventPageState extends State<CreateEventPage> {
 
   Future<String?> _uploadImage() async {
     if (_imageBytes == null) return null;
-    setState(() => isUploading = true);
 
     try {
       final inputFile = InputFile.fromBytes(
@@ -99,8 +100,8 @@ class _CreateEventPageState extends State<CreateEventPage> {
         fileId: ID.unique(),
         file: inputFile,
         permissions: [
-          Permission.read(Role.any()), // 👈 Public read access
-          Permission.write(Role.user(SavedData.getUserId())), // owner can edit/delete
+          Permission.read(Role.any()),
+          Permission.write(Role.user(SavedData.getUserId())),
         ],
       );
 
@@ -108,147 +109,187 @@ class _CreateEventPageState extends State<CreateEventPage> {
       return response.$id;
     } catch (e) {
       print("❌ Error uploading image: $e");
+      ScaffoldMessenger.of(context)
+          .showSnackBar(SnackBar(content: Text("Error uploading image: $e")));
       return null;
-    } finally {
-      setState(() => isUploading = false);
     }
   }
 
+  Future<void> _createEvent() async {
+    if (_nameController.text.isEmpty ||
+        _descController.text.isEmpty ||
+        _locationController.text.isEmpty ||
+        _dateTimeController.text.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
+          content: Text(
+              "Event Name, Description, Location, Date & Time are required.")));
+      return;
+    }
+
+    setState(() => _isLoading = true);
+
+    try {
+      final uploadedImageId = await _uploadImage();
+
+      await createEvent(
+        _nameController.text,
+        _descController.text,
+        uploadedImageId ?? "",
+        _locationController.text,
+        _dateTimeController.text,
+        userId,
+        _isInPersonEvent,
+        _guestController.text,
+        _sponsersController.text,
+      );
+
+      ScaffoldMessenger.of(context)
+          .showSnackBar(const SnackBar(content: Text("✅ Event Created!")));
+      Navigator.pop(context);
+    } catch (e) {
+      print("❌ Error creating event: $e");
+      ScaffoldMessenger.of(context)
+          .showSnackBar(SnackBar(content: Text("Error creating event: $e")));
+    } finally {
+      setState(() => _isLoading = false);
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      body: SingleChildScrollView(
-        padding: const EdgeInsets.all(12),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
+      body: AbsorbPointer(
+        absorbing: _isLoading,
+        child: Stack(
           children: [
-            const SizedBox(height: 50),
-            const CustomHeadText(text: "Create Event"),
-            const SizedBox(height: 25),
+            SingleChildScrollView(
+              padding: const EdgeInsets.all(12),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  const SizedBox(height: 50),
+                  const CustomHeadText(text: "Create Event"),
+                  const SizedBox(height: 25),
 
-            // Event Image Picker
-            GestureDetector(
-              onTap: _pickImage,
-              child: Container(
-                width: double.infinity,
-                height: MediaQuery.of(context).size.height * 0.3,
-                decoration: BoxDecoration(
-                    color: kLightGreen, borderRadius: BorderRadius.circular(8)),
-                child: _imageBytes != null
-                    ? ClipRRect(
-                  borderRadius: BorderRadius.circular(8),
-                  child: Image.memory(_imageBytes!, fit: BoxFit.cover),
-                )
-                    : Column(
-                  mainAxisAlignment: MainAxisAlignment.center,
-                  children: const [
-                    Icon(Icons.add_a_photo_outlined, size: 42),
-                    SizedBox(height: 8),
-                    Text(
-                      "Add Event Image",
-                      style: TextStyle(
-                          fontWeight: FontWeight.w600, color: Colors.black),
-                    )
-                  ],
-                ),
+                  // Image picker
+                  GestureDetector(
+                    onTap: _pickImage,
+                    child: Container(
+                      width: double.infinity,
+                      height: MediaQuery.of(context).size.height * 0.3,
+                      decoration: BoxDecoration(
+                          color: kLightGreen,
+                          borderRadius: BorderRadius.circular(8)),
+                      child: _imageBytes != null
+                          ? ClipRRect(
+                        borderRadius: BorderRadius.circular(8),
+                        child: Image.memory(_imageBytes!,
+                            fit: BoxFit.cover),
+                      )
+                          : Column(
+                        mainAxisAlignment: MainAxisAlignment.center,
+                        children: const [
+                          Icon(Icons.add_a_photo_outlined, size: 42),
+                          SizedBox(height: 8),
+                          Text(
+                            "Add Event Image",
+                            style: TextStyle(
+                                fontWeight: FontWeight.w600,
+                                color: Colors.black),
+                          )
+                        ],
+                      ),
+                    ),
+                  ),
+                  const SizedBox(height: 8),
+                  CustomInputForm(
+                      controller: _nameController,
+                      icon: Icons.event_outlined,
+                      label: "Event Name",
+                      hint: "Add Event Name"),
+                  const SizedBox(height: 8),
+                  CustomInputForm(
+                      maxLines: 4,
+                      controller: _descController,
+                      icon: Icons.description_outlined,
+                      label: "Description",
+                      hint: "Add Description"),
+                  const SizedBox(height: 8),
+                  CustomInputForm(
+                      controller: _locationController,
+                      icon: Icons.location_on_outlined,
+                      label: "Location",
+                      hint: "Enter Location of Event"),
+                  const SizedBox(height: 8),
+                  CustomInputForm(
+                    controller: _dateTimeController,
+                    icon: Icons.date_range_outlined,
+                    label: "Date & Time",
+                    hint: "Pick Date Time",
+                    readOnly: true,
+                    onTap: () => _selectDateTime(context),
+                  ),
+                  const SizedBox(height: 8),
+                  CustomInputForm(
+                      controller: _guestController,
+                      icon: Icons.people_outlined,
+                      label: "Guests",
+                      hint: "Enter list of guests"),
+                  const SizedBox(height: 8),
+                  CustomInputForm(
+                      controller: _sponsersController,
+                      icon: Icons.attach_money_outlined,
+                      label: "Sponsors",
+                      hint: "Enter Sponsors"),
+                  const SizedBox(height: 8),
+                  Row(
+                    children: [
+                      const Text("In Person Event",
+                          style: TextStyle(fontSize: 20)),
+                      const Spacer(),
+                      Switch(
+                        activeColor: kLightGreen,
+                        value: _isInPersonEvent,
+                        onChanged: (val) =>
+                            setState(() => _isInPersonEvent = val),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 12),
+                  SizedBox(
+                    width: double.infinity,
+                    height: 50,
+                    child: ElevatedButton(
+                      onPressed: _isLoading ? null : _createEvent,
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor:
+                        _isLoading ? Colors.grey : kLightGreen,
+                      ),
+                      child: _isLoading
+                          ? const SizedBox(
+                          height: 24,
+                          width: 24,
+                          child: CircularProgressIndicator(
+                              color: Colors.white, strokeWidth: 2))
+                          : const Text(
+                        "Create New Event",
+                        style: TextStyle(
+                            fontSize: 20, fontWeight: FontWeight.w900),
+                      ),
+                    ),
+                  ),
+                ],
               ),
             ),
 
-            const SizedBox(height: 8),
-            CustomInputForm(
-                controller: _nameController,
-                icon: Icons.event_outlined,
-                label: "Event Name",
-                hint: "Add Event Name"),
-            const SizedBox(height: 8),
-            CustomInputForm(
-                maxLines: 4,
-                controller: _descController,
-                icon: Icons.description_outlined,
-                label: "Description",
-                hint: "Add Description"),
-            const SizedBox(height: 8),
-            CustomInputForm(
-                controller: _locationController,
-                icon: Icons.location_on_outlined,
-                label: "Location",
-                hint: "Enter Location of Event"),
-            const SizedBox(height: 8),
-            CustomInputForm(
-              controller: _dateTimeController,
-              icon: Icons.date_range_outlined,
-              label: "Date & Time",
-              hint: "Pick Date Time",
-              readOnly: true,
-              onTap: () => _selectDateTime(context),
-            ),
-            const SizedBox(height: 8),
-            CustomInputForm(
-                controller: _guestController,
-                icon: Icons.people_outlined,
-                label: "Guests",
-                hint: "Enter list of guests"),
-            const SizedBox(height: 8),
-            CustomInputForm(
-                controller: _sponsersController,
-                icon: Icons.attach_money_outlined,
-                label: "Sponsors",
-                hint: "Enter Sponsors"),
-            const SizedBox(height: 8),
-
-            Row(
-              children: [
-                const Text("In Person Event", style: TextStyle(fontSize: 20)),
-                const Spacer(),
-                Switch(
-                    activeColor: kLightGreen,
-                    value: _isInPersonEvent,
-                    onChanged: (val) => setState(() => _isInPersonEvent = val)),
-              ],
-            ),
-            const SizedBox(height: 8),
-
-            SizedBox(
-              width: double.infinity,
-              height: 50,
-              child: MaterialButton(
-                color: kLightGreen,
-                onPressed: () async {
-                  if (_nameController.text.isEmpty ||
-                      _descController.text.isEmpty ||
-                      _locationController.text.isEmpty ||
-                      _dateTimeController.text.isEmpty) {
-                    ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
-                        content: Text(
-                            "Event Name, Description, Location, Date & time are required.")));
-                    return;
-                  }
-
-                  final uploadedImageId = await _uploadImage();
-
-                  await createEvent(
-                    _nameController.text,
-                    _descController.text,
-                    uploadedImageId ?? "",
-                    _locationController.text,
-                    _dateTimeController.text,
-                    userId,
-                    _isInPersonEvent,
-                    _guestController.text,
-                    _sponsersController.text,
-                  );
-
-                  ScaffoldMessenger.of(context)
-                      .showSnackBar(const SnackBar(content: Text("Event Created!")));
-                  Navigator.pop(context);
-                },
-                child: const Text(
-                  "Create New Event",
-                  style: TextStyle(fontSize: 20, fontWeight: FontWeight.w900),
+            // Optional overlay spinner
+            if (_isLoading)
+              Container(
+                color: Colors.black.withOpacity(0.3),
+                child: const Center(
+                  child: CircularProgressIndicator(color: Colors.white),
                 ),
               ),
-            )
           ],
         ),
       ),

@@ -16,6 +16,43 @@ class _LoginPageState extends State<LoginPage> {
   final TextEditingController _emailController = TextEditingController();
   final TextEditingController _passwordController = TextEditingController();
 
+  bool _isLoading = false; // 👈 Tracks if login is in progress
+
+  Future<void> _handleLogin() async {
+    if (_emailController.text.isEmpty || _passwordController.text.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text("Please enter your email and password.")),
+      );
+      return;
+    }
+
+    setState(() => _isLoading = true); // 👈 Start loading
+
+    final result = await loginUser(
+      _emailController.text.trim(),
+      _passwordController.text.trim(),
+    );
+
+    setState(() => _isLoading = false); // 👈 Stop loading
+
+    if (result == true) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text("Login Successful!")),
+      );
+      Future.delayed(
+        const Duration(seconds: 1),
+            () => Navigator.pushReplacement(
+          context,
+          MaterialPageRoute(builder: (context) => const Homepage()),
+        ),
+      );
+    } else {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text("Login failed. Try again.")),
+      );
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -24,110 +61,108 @@ class _LoginPageState extends State<LoginPage> {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            SizedBox(
-              height: 80,
-            ),
+            const SizedBox(height: 80),
             Text(
               "Login",
               style: TextStyle(
-                  color: kLightGreen,
-                  fontSize: 32,
-                  fontWeight: FontWeight.w800),
+                color: kLightGreen,
+                fontSize: 32,
+                fontWeight: FontWeight.w800,
+              ),
             ),
-            SizedBox(
-              height: 8,
-            ),
+            const SizedBox(height: 8),
             CustomInputForm(
-                controller: _emailController,
-                icon: Icons.email_outlined,
-                label: "Email",
-                hint: "Enter your Email"),
-            SizedBox(
-              height: 8,
+              controller: _emailController,
+              icon: Icons.email_outlined,
+              label: "Email",
+              hint: "Enter your Email",
             ),
+            const SizedBox(height: 8),
             CustomInputForm(
-                obscureText: true,
-                controller: _passwordController,
-                icon: Icons.lock_outline_rounded,
-                label: "Password",
-                hint: "Enter your Password"),
-            SizedBox(
-              height: 8,
+              obscureText: true,
+              controller: _passwordController,
+              icon: Icons.lock_outline_rounded,
+              label: "Password",
+              hint: "Enter your Password",
             ),
+            const SizedBox(height: 8),
             Row(
               mainAxisAlignment: MainAxisAlignment.end,
               children: [
                 Text(
                   "Forget Password",
                   style: TextStyle(
-                      color: kLightGreen,
-                      fontSize: 16,
-                      fontWeight: FontWeight.w300),
+                    color: kLightGreen,
+                    fontSize: 16,
+                    fontWeight: FontWeight.w300,
+                  ),
                 ),
               ],
             ),
-            SizedBox(
-              height: 8,
-            ),
+            const SizedBox(height: 16),
             SizedBox(
               width: double.infinity,
               height: 50,
               child: ElevatedButton(
-                onPressed: () {
-                  loginUser(_emailController.text, _passwordController.text)
-                      .then((value) {
-                    if (value) {
-                      ScaffoldMessenger.of(context).showSnackBar(
-                          SnackBar(content: Text("Login Successful !!!")));
-
-                      Future.delayed(
-                          Duration(seconds: 2),
-                          () => Navigator.push(
-                              context,
-                              MaterialPageRoute(
-                                  builder: (context) => Homepage())));
-                    } else {
-                      ScaffoldMessenger.of(context).showSnackBar(
-                          SnackBar(content: Text("Login Failed Try Again.")));
-                    }
-                  });
-                },
-                child: Text("Login"),
+                onPressed: _isLoading ? null : _handleLogin, // 👈 Disable when loading
                 style: OutlinedButton.styleFrom(
-                    foregroundColor: kLightGreen,
-                    shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(8))),
+                  foregroundColor: Colors.white,
+                  backgroundColor:
+                  _isLoading ? Colors.grey : kLightGreen, // 👈 Dim while loading
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(8),
+                  ),
+                ),
+                child: _isLoading
+                    ? const SizedBox(
+                  width: 24,
+                  height: 24,
+                  child: CircularProgressIndicator(
+                    color: Colors.white,
+                    strokeWidth: 3,
+                  ),
+                )
+                    : const Text(
+                  "Login",
+                  style: TextStyle(
+                    fontSize: 18,
+                    fontWeight: FontWeight.w700,
+                  ),
+                ),
               ),
             ),
-            SizedBox(
-              height: 8,
-            ),
+            const SizedBox(height: 12),
             GestureDetector(
-              onTap: () => Navigator.push(context,
-                  MaterialPageRoute(builder: (context) => SignUpPage())),
+              onTap: _isLoading
+                  ? null
+                  : () => Navigator.push(
+                context,
+                MaterialPageRoute(
+                    builder: (context) => const SignUpPage()),
+              ),
               child: Row(
                 mainAxisAlignment: MainAxisAlignment.center,
                 children: [
                   Text(
-                    "Create a New Account ?",
+                    "Create a New Account?",
                     style: TextStyle(
-                        color: kLightGreen,
-                        fontSize: 16,
-                        fontWeight: FontWeight.w300),
+                      color: kLightGreen,
+                      fontSize: 16,
+                      fontWeight: FontWeight.w300,
+                    ),
                   ),
-                  SizedBox(
-                    width: 4,
-                  ),
+                  const SizedBox(width: 4),
                   Text(
                     "Sign Up",
                     style: TextStyle(
-                        color: kLightGreen,
-                        fontSize: 16,
-                        fontWeight: FontWeight.w600),
+                      color: kLightGreen,
+                      fontSize: 16,
+                      fontWeight: FontWeight.w600,
+                    ),
                   )
                 ],
               ),
-            )
+            ),
           ],
         ),
       ),
